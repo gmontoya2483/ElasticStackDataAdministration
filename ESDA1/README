@@ -1,0 +1,29 @@
+Elastic Stack Data Administration I - Lab Kit / Version 6.0.1
+--------------------------------------------------------------------------------
+
+This archive contains all the tools, scripts, and data needed to perform the lab
+portions of the corresponding course. Please use the version and installation of
+the Elastic Stack compponents in this distribution as opposed to one you may
+already have installed. Included:
+
+ami/           contains the AMI configuration and setup files
+datasets/      contains the data used in the labs and lecture
+instructions/  contains the lab instructions accessible via this index.html file
+elasticsearch/ contains the Elasticsearch distribution extracted
+filebeat/      contains the Linux 64 bits Filebeat distribution extracted
+heartbeat/     contains the Linux 64 bits Heartbeat distribution extracted
+logstash/      contains the Logstash distribution extracted
+kibana/        contains the Linux 64 bits Kibana distribution extracted
+metricbeat/    contains the Linux 64 bits Metricbeat distribution extracted
+packetbeat/    contains the Linux 64 bits Packetbeat distribution extracted
+scripts/       contains a few scripts to simulate load during the lab
+README         this file
+
+--------------------------------------------------------------------------------
+Contine the learning process with the following resources!
+
+ - https://www.elastic.co/learn
+ - https://discuss.elastic.co
+ - https://github.com/elastic
+ - http://elasticsearch.meetup.com
+

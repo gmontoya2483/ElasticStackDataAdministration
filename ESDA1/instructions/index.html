@@ -1,0 +1,2320 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <title>Lab Guide: Elastic Stack Data Administration</title>
+    <link rel="shortcut icon" href="images/favicon.ico" type="image/x-icon">
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <link rel="stylesheet" href="includes/elastic_training.css">
+    <script type="text/javascript" src="includes/elastic_training.js"></script>
+  </head>
+
+  <body>
+    <img class="logo" src="images/elastic-logo.svg" width="300">
+    <div class="header">Lab Guide: Elastic Stack Data Administration</div>
+    <ul>
+      <li><a href="#about">About</a></li>
+      <li><a href="#lab1">Lab 1: Elastic Stack Data Administration Concepts</a></li>
+      <li><a href="#lab2">Lab 2: System Metrics</a></li>
+      <li><a href="#lab3">Lab 3: Services Metrics</a></li>
+      <li><a href="#lab4">Lab 4: Ingesting File Data</a></li>
+      <li><a href="#lab5">Lab 5: Data Processing</a></li>
+      <li><a href="#lab6">Lab 6: Data Enrichment</a></li>
+      <li><a href="#lab7">Lab 7: Data Store Integration</a></li>
+      <li><a href="#lab8">Lab 8: Network Monitoring</a></li>
+      <li><a href="#lab9">Lab 9: Data Ingestion Architectures</a></li>
+      <li><a href="#lab10">Lab 10: Triage and Maintenance</a></li>
+    </ul>
+    <hr/>
+
+    <a name="about"></a>
+    <h2>About</h2>
+
+    Hello, welcome to the Elastic Stack Data Administration Lab. In this lab you will find a detailed step by step guide that will help you practice the concepts learned in each of the lectures. This training uses several applications and we provided an environment which has already been set up for you. It is an Ubuntu server (running in the cloud) that can be accessed via the Strigo UI by clicking on the <strong>"My Lab"</strong> icon in the left toolbar: <img src="images/lab00_strigo_lab_icon.png"/>
+
+    After clicking on it you should see one command prompt. If you list the contents of the home folder you should see:
+    <ul>
+      <li><strong>ami</strong>: contains the AMI configuration and setup files</li>
+      <li><strong>datasets</strong>: contains the data used in the labs and lecture</li>
+      <li><strong>instructions</strong>: contains the lab instructions accessible via this <strong>index.html</strong> file</li>
+      <!--<li><strong>solutions</strong>: contains the lab solutions and demo code from the slides</li>-->
+      <li><strong>elasticsearch</strong>: contains the Elasticsearch distribution extracted</li>
+      <li><strong>filebeat</strong>: contains the Linux 64 bits Filebeat distribution extracted</li>
+      <li><strong>heartbeat</strong>: contains the Linux 64 bits Heartbeat distribution extracted</li>
+      <li><strong>logstash</strong>: contains the Logstash distribution extracted</li>
+      <li><strong>kibana</strong>: contains the Linux 64 bits Kibana distribution extracted</li>
+      <li><strong>metricbeat</strong>: contains the Linux 64 bits Metricbeat distribution extracted</li>
+      <li><strong>packetbeat</strong>: contains the Linux 64 bits Packetbeat distribution extracted</li>
+      <li><strong>scripts</strong>: contains a few scripts to simulate load during the lab.</li>
+    </ul>
+
+    <!-- ********************************************************** -->
+
+    <a name="lab1"></a>
+    <h2>Lab 1: Elastic Stack Data Administration Concepts</h2>
+    <p>
+      <strong>Objective:</strong> In this lab, you will see how quickly and easily the Elastic Stack can be used to monitor an HTTP service and visualize data. You will startup Elasticsearch, Kibana and Heartbeat with the proper configuration and then explore the data.
+    </p>
+
+    <ol>
+      <li>
+        Start Elasticsearch using the following command:
+        <pre class="bash">
+          ./elasticsearch/bin/elasticsearch
+        </pre>
+      </li>
+      <li>
+        Wait for Elasticsearch to startup. You should see a message showing that it started. (The output order may vary a bit.)
+        <pre class="bash">[2017-08-18T13:49:41,343][INFO ][o.e.g.GatewayService     ] [iU0ZdjR] recovered [0] indices into cluster_state<br>
+[2017-08-18T13:49:41,345][INFO ][o.e.h.n.Netty4HttpServerTransport] [iU0ZdjR] publish_address {127.0.0.1:9200}, bound_addresses {[::1]:9200}, {127.0.0.1:9200}<br>
+[2017-08-18T13:49:41,345][INFO ][o.e.n.Node               ] [iU0ZdjR] started
+        </pre>
+      </li>
+
+      <li>
+        Configure Heartbeat to monitor the Elastic website (https://www.elastic.co) every 10 seconds. In a new terminal tab, open the default Heartbeat configuration file (heartbeat.yml) and change the <strong>urls</strong> property and validate that the <strong>schedule</strong> property is set to <kbd>'@every 10s'</kbd>. If you are not familiar with text editors in a terminal, click <a href="strigo_edit_file.html" target="_blank">here</a> to see how to edit a file in Strigo.<!-- TODO -->
+        <div class="solution">
+          <pre><code>heartbeat.monitors:
+- type: http
+
+  # List or urls to query
+  <b>urls: ["https://www.elastic.co"]</b>
+
+  # Configure task schedule
+  <b>schedule: '@every 10s'</b>
+</code></pre>
+
+        </div>
+      </li>
+
+      <li>
+        Next, you need to start Heartbeat. By default Heartbeat uses the heartbeat.yml file that is located in the current folder. So, don't forget to change into the heartbeat directory before starting it.
+        <div class="solution">
+          <pre class="bash">cd heartbeat<br>./heartbeat</pre>
+          Heartbeat will now begin monitoring <i>https://www.elastic.co</i> every 10 seconds and write the request information to Elasticsearch, which should still be running. Next, let's visualize this data with Kibana.
+        </div>
+      </li>
+
+      <li>
+        First, start Kibana in another terminal tab. (Don't forget to bind it to 0.0.0.0 so you can access it from your machine.)
+        <div class="solution">
+          To start Kibana run the following command:
+          <pre class="bash">./kibana/bin/kibana --host 0.0.0.0</pre>
+
+          You should see the following output:
+          <pre class="bash">  log   [15:59:23.210] [info][listening] Server running at http://0.0.0.0:5601<br>
+  log   [15:59:23.211] [info][status][ui settings] Status changed from uninitialized to yellow - Elasticsearch plugin is yellow<br>
+  log   [15:59:28.019] [info][status][plugin:elasticsearch] Status changed from yellow to yellow - No existing Kibana index found<br>
+  log   [15:59:29.060] [info][status][plugin:elasticsearch] Status changed from yellow to green - Kibana index ready<br>
+  log   [15:59:29.061] [info][status][ui settings] Status changed from yellow to green - Ready<br>
+          </pre>
+        </div>
+      </li>
+
+      <li>
+        Now that Kibana is running, open a browser and connect to your instance at port 5601. You can find your instance address at:
+
+        <img src="images/lab1_instance_address1.png"/>
+        <img src="images/lab1_instance_address2.png"/>
+
+        In the above example the final address would be:<br> http://ec2-52-29-118-82.eu-central-1.compute.amazonaws.com:5601
+      </li>
+
+      <li>
+        Data is being collected by Heartbeat and indexed into Elasticsearch. Kibana is running and also connected to Elasticsearch. Next, you will analyze this data in Kibana. The first step is to define an <strong>Index Pattern</strong> so Kibana knows which index(es) to search.
+        <ul>
+          <li>Click on <strong>Management</strong> and then on <strong>Index Patterns</strong>:</li>
+
+          <img src="images/lab1_create_index_pattern1.png"/>
+
+          <li>Set heartbeat-* as the Index Pattern:</li>
+
+          <img src="images/lab1_create_index_pattern2.png"/>
+        </ul>
+      </li>
+
+      <li>
+        Now we will create a line chart of the average round-trip-time (rtt) of requests per minute.
+        <ul>
+          <li>Click on <strong>Visualize</strong> and then on <strong>Create a visualization</strong>:
+
+          <img src="images/lab1_create_viz1.png"/>
+
+          <li>Select <strong>Line</strong> from the Basic Charts options:</li>
+
+          <img src="images/lab1_create_viz2.png"/>
+
+          <li>Click on <strong>heartbeat-*</strong>. (This is the index pattern we created, which defines from which indices we will read data from.)</li>
+
+          <img src="images/lab1_create_viz3.png"/>
+
+          <li>Let's split the <strong>X-Axis</strong> into 1 minute buckets by @timestamp. In other words, let's build a <strong>Date Histogram</strong> using the <strong>@timestamp</strong> field with <strong>minute</strong> interval.</li>
+
+          <img src="images/lab1_create_viz4.png" align="left" width="380"/>
+          <img src="images/lab1_create_viz5.png" width="380"/>
+
+          <li>Instead of a <strong>Count</strong>, update the <strong>Y-Axis</strong> to calculate the <strong>average</strong> of <strong>http.rtt.total.us</strong> (<em>us</em> stands for microsecond).</li>
+
+          <img src="images/lab1_create_viz6.png"/>
+
+          <li>Click the play button to see the results:</li>
+
+          <img src="images/lab1_create_viz7.png"/>
+
+          <li>Finally, save your visualization as <strong>Heartbeat - Average Round Trip Time per Minute</strong></li>
+
+          <img src="images/lab1_create_viz8.png"/>
+        </ul>
+      </li>
+
+      <li>
+        Although it is nice to know how to create your own visualizations, in many cases you don't need to. Heartbeat has a set of pre-built visualizations and one dashboard that you can use. To import those dashboards:
+        <ul>
+          <li>
+            Open another terminal, change to heartbeat directory and run the setup command.
+            <pre class="bash">
+            cd heartbeat<br>
+            ./heartbeat setup --dashboards</pre>
+          </li>
+          <br>
+
+          <li>
+            Optionally, you could change the heartbeat.yml file to enable dashboards setup and restart Heartbeat:
+            <pre><code>setup.dashboards.enabled: true</code></pre>
+          </li>
+        </ul>
+      </li>
+
+      <li>
+        Now, let's look into a Heartbeat pre-built dashboard. In Kibana, click on <strong>Dashboards</strong> and select <strong>Heartbeat HTTP monitoring</strong>.
+
+        <img src="images/lab1_dashboard1.png"/>
+
+        <img src="images/lab1_dashboard2.png"/>
+      </li>
+
+      <li>
+        By clicking at the top-right corner (time picker) you can enable auto-refresh, otherwise you will look into static data.
+
+        <img src="images/lab1_refresh.png"/>
+      </li>
+
+      <li>
+        Understand and explore the dashboard for a few minutes (move and resize visualizations, add and remove filters, etc.). Then, click on <strong>Edit</strong> to add your <strong>Average Round Trip Time per Minute</strong> visualization to the dashboard.
+
+        <img src="images/lab1_dashboard3.png"/>
+      </li>
+
+      <li>
+        You probably don't have a lot of data right now, but as an exercise answer the following questions:
+        <ul>
+          <li>Is the Elastic website up?</li>
+          <li>What is the returned response code?</li>
+          <li>Which part(s) of the communication take(s) the most time?</li>
+          <li>What was the latest Average Round Trip Time per Minute?</li>
+        </ul>
+      </li>
+    </ol>
+
+    <p>
+      <b>Summary:</b> You have succesfully started and used Elasticsearch, Kibana, and Heartbeat. Heartbeat pings the Elastic website every 10 seconds and stores that information in Elasticsearch. Then, Kibana reads that data and transforms it into nice visualizations combined onto a single dashboard. Besides monitoring a website service, you might want to monitor an operating system...
+    </p>
+
+    <hr/>
+
+
+
+        <!-- ******************************************************************************* -->
+
+
+
+
+    <a name="lab2"></a>
+    <h2>Lab 2: System Metrics</h2>
+    <p>
+      <strong>Objective:</strong> In this lab you will see how quickly and easily you can use Elasticsearch, Kibana, and Metricbeat to monitor CPU, RAM, disk usage, and processes running on a operating system.
+    </p>
+    <ol>
+      <li>
+        Start Metricbeat with a flag to log to the terminal.
+
+        <div class="solution">
+          From the home folder run:
+          <pre class="bash">
+            cd metricbeat<br>
+            ./metricbeat -e
+          </pre>
+
+          <em>
+            Notice that the -e option tells Beats to log to stderr and to disable syslog/file output. This is a good options for running it in the foreground and debugging. Optionally, you can also use the -d flag to enable debugging for the specified selectors. For example, the following command will start Metricbeat and print all the "publish" related messages to the terminal.
+          </em>
+
+          <pre class="bash">./metricbeat -e -d "publish"</pre>
+        </div>
+      </li>
+
+      <li>
+        Check if the data is correctly index to Elasticsearch.
+        <div class="solution">
+          You can execute the following command a few times and check if the number of documents is increasing.
+          <pre class="bash">curl "localhost:9200/metricbeat-*/_count"</pre>
+           You can paste the command above to a terminal or to Console (which will automatically adapt it).
+        </div>
+      </li>
+
+      <li>
+        Another option is to visualize the data in Kibana. Add metricbeat-* as an index pattern with @timestamp as the Time Filter and then go to discover and select <strong>metricbeat-*</strong> to see ingested metrics.
+
+        <img src="images/lab2_metricbeat_discover.png"/>
+      </li>
+
+      <li>
+        How often is Metricbeat collecting data? (Tip: drill down into the bar chart and then mouse over the points.)
+
+        <div class="solution">
+          We can also look into the config file (modules.d/system.yml) to see how often Metricbeat is collecting data. There are two system modules enabled, one collecting cpu, load, memory, network, process_summary, and process every 10 seconds and another one collecting filesystem and fsstat every 1 minute. Disk usage granularity can be much lower than other metrics (e.g. CPU).
+        </div>
+      </li>
+
+      <li>
+        In another tab, execute metricbeat with the option to load the pre-built dashboards.
+
+        <div class="solution">
+          <pre class="bash">
+            cd metricbeat<br>
+            ./metricbeat setup --dashboards
+          </pre>
+        </div>
+      </li>
+
+      <li>
+        Now, open the <strong>Metricbeat host overview</strong> dashboard. <i>(You might need to click Dashboard twice as, by default, Kibana loads the latest used Dashboard.)</i>
+
+        <img src="images/lab2_metricbeat_dashboard.png" />
+
+        Add a * to the search bar. (There is known bug that causes this dashboard to be empty because it is missing the *.)
+
+        <img src="images/lab2_metricbeat_dashboard2.png" />
+      </li>
+
+      <li>
+        Looking into the <strong>Metricbeat host overview</strong> dashboard answer the following questions:
+        <ul>
+          <li>What is the CPU Usage?</li>
+          <li>What is the Memory Usage?</li>
+          <li>What is the Disk Usage?</li>
+          <li>What are the top 5 processes running? (scroll down a bit :)</li>
+        </ul>
+      </li>
+
+      <li>
+        How would you adjust the granularity for analyzing one single day of data?
+
+        <div class="solution">
+          As we are going to be looking into one single day of data and we will be interacting with the computer most of the time, one could change the period from 10 seconds to 5 seconds for general metrics and from 1 minute to 30 seconds for disk metrics. Also, one could increase the number of processes information for both cpu and memory from 5 to 10.
+          <br>
+          <em>
+            The above are just ideas and the values will change for each use case.
+          </em>
+        </div>
+      </li>
+
+      <li>
+        Now that you thought about the best collection period for your use case, let's update the config file to reflect it. Open the system.yml file and update your chosen values for period and processes.
+
+        <div class="solution">
+          <pre class="bash">vim modules.d/system.yml</pre>
+          <pre><code>- module: system
+  enabled: true
+  <strong>period: 5s</strong>
+  metricsets:
+    ...
+  processes: ['.*']
+  process.include_top_n:
+    <strong>by_cpu: 10</strong>
+    <strong>by_memory: 10</strong>
+- module: system
+  enabled: true
+  <strong>period: 30s</strong>
+  ...
+          </code></pre>
+        </div>
+      </li>
+
+      <li>
+        Now that you modified the configuration file, test it to make sure you did not break it.
+        <div class="solution">
+          <pre class="bash">./metricbeat test config</pre>
+          The output should say:
+          <pre><code>Config OK</code></pre>
+        </div>
+      </li>
+
+      <li>
+        Also test the modules and the output to check if everything is ok before executing Metricbeat.
+        <div class="solution">
+          <pre class="bash">./metricbeat test modules</pre>
+          <pre class="bash">./metricbeat test output</pre>
+        </div>
+      </li>
+
+      <li>
+        Restart Metricbeat.
+        <div class="solution">
+          There is no need for the setup option anymore as Kibana data was already loaded.
+          <pre class="bash">./metricbeat</pre>
+        </div>
+      </li>
+
+      <li>
+        From the home folder run the following script to produce some artificial load.
+
+        <pre class="bash">./scripts/artificial_load.sh</pre>
+
+        As you monitor the machine load can you answer:
+        <ul>
+          <li>Is the script using 100% CPU at some point?</li>
+          <li>Does it use memory? If yes, how much?</li>
+          <li>What is(are) the name of the process(es) responsible for the above?</li>
+        </ul>
+        <div class="solution">
+          <ul>
+            <li>Yes, it hits 100% CPU.</li>
+            <li>There is no significant extra memory use.</li>
+            <li>As can be seen in the Top Processes By CPU, mysqld and nginx are the main CPU consumers.</li>
+          </ul>
+        </div>
+      </li>
+
+    </ol>
+    <p>
+      <strong>Summary:</strong> You have succesfully used Elasticsearch, Kibana, and Metricbeat to monitor the operating system. Metricbeat is executed on the monitored machine, then it collects data every 10 seconds and stores that in Elasticsearch. Pre-built dashboards are available to speed up your monitoring capability. Besides monitoring the operating system, you might want to monitor a service that is running on the operating system.
+    </p>
+    <hr/>
+
+
+
+        <!-- ******************************************************************************* -->
+
+
+
+    <a name="lab3"></a>
+    <h2>Lab 3: Services Metrics</h2>
+    <p>
+      <strong>Objective:</strong> In this lab, you will learn how Console is a powerful tool to write and read data from Elasticsearch. Then, you will see how quickly and easily you can change Metricbeat configuration to monitor nginx and MySQL services.
+    </p>
+
+    <ol>
+
+      <li>
+        Click on the <strong>Dev Tools</strong> button in the side navigation pane to open the <strong>Console</strong> application. <strong>Console</strong> is a Kibana app that serves as an IDE to interact with Elasticsearch. Notice there is a <code>match_all</code> query already written. You can run it by clicking the green <em>play</em> button.
+
+        <img src="images/lab2_console.png"/>
+
+        Take a look into the documents that were returned. You can see the metadata (_index, _type, _id, _version) and the data (_source).
+      </li>
+
+      <li>
+        As we said before, Elasticsearch is not the main focus of this course. However, it is important to know how to execute CRUD operations and simple queries. Let's start by creating 2 documents in the <strong>my_metrics</strong> index with a <strong>doc</strong> type. Create the first one with id <strong>1</strong> and the second without an id.
+        <pre><code>{"metricset":{"module":"system","name":"load","rtt":81},"tag":["dev"]}
+{"metricset":{"module":"nginx","name":"stubstatus","rtt":81},"tag":["production system","frontend"]}</code></pre>
+
+        <div class="solution">
+          <pre><code>PUT my_metrics/doc/1
+{
+  "metricset": {
+    "module": "system",
+    "name": "load",
+    "rtt": 81
+  },
+  "tag": ["dev"]
+}
+
+POST my_metrics/doc/
+{
+  "metricset": {
+    "module": "nginx",
+    "name": "stubstatus",
+    "rtt": 81
+  },
+  "tag": ["production system", "frontend"]
+}</code></pre>
+        </div>
+      </li>
+
+      <li>
+        Now, read one document at a time. (Instead of clicking the green play button try running the command using the crtl+enter, or cmd+enter on Mac, shortcut).
+        <div class="solution">
+          <pre><code>GET my_metrics/doc/1
+GET my_metrics/doc/_id_returned_by_the_index_request_
+</code></pre>
+          If you don't know the generated id anymore, go to the next step and use a search to figure it out.
+        </div>
+      </li>
+
+      <li>
+        Search the index.
+        <div class="solution">
+          <pre><code>GET my_metrics/_search</code></pre>
+        </div>
+      </li>
+
+      <li>
+        Searches can be quite complex in Elasticsearch. Let's keep it simple but go a bit further than the trivial example. Search for documents that contain the term <strong>system</strong>. Next, search for documents that contain the term <strong>system</strong> in the <strong>metricset.module</strong> field.
+        <div class="solution">
+          <pre><code>GET my_metrics/_search?q=system
+GET my_metrics/_search?q=metricset.module:system
+</code></pre>
+          This is a simple but very useful type of query to verify if data ingestion is actually happening. Also, if you don't care about the returned documents, you can execute a _count instead of a _search.
+          <pre><code>GET my_metrics/_count?q=metricset.module:system</code></pre>
+        </div>
+      </li>
+
+      <li>
+        Finally, delete document <strong>1</strong> and then delete the <strong>my_metrics</strong> index. Deleting an index will be very useful whenever you encounter problems ingesting data and want to start over again.
+        <div class="solution">
+          <pre><code>DELETE my_metrics/doc/1
+DELETE my_metrics
+</code></pre>
+        </div>
+      </li>
+
+      <li>
+        Enough on Elasticsearch and Console, let's go back into collecting data. Let's start by updating the configuration to monitor nginx. Enable the nginx module and update it to monitor localhost every five seconds.
+
+        <div class="solution">
+          <pre class="bash">mv modules.d/nginx.yml.disabled modules.d/nginx.yml</pre>
+
+          <pre class="bash">vim modules.d/nginx.yml</pre>
+          <pre><code>period: 5s</code></pre>
+        </div>
+      </li>
+
+      <li>
+        What is the end point that Metricbeat is using to collect metrics directly from nginx?
+        <div class="solution">
+          You can see in modules.d/nginx.yml that by default Metricbeat is configured to collect metrics at /server-status endpoint.
+        </div>
+      </li>
+
+      <li>
+        Stop Metricbeat, test config, modules, and output, and start it again.
+        <div class="solution">
+          To stop Metricbeat use Crtl+C in the terminal it is running.<br>
+
+          <pre class="bash">./metricbeat test config</pre>
+          <pre class="bash">./metricbeat test modules</pre>
+          <pre class="bash">./metricbeat test output</pre>
+
+          To start it, run the same command as before:
+          <pre class="bash">./metricbeat</pre>
+        </div>
+      </li>
+
+      <li>
+        To check if the nginx data is really going to Elasticsearch and what a collected document looks like, you can execute the following command in the terminal or Console:
+        <pre class="bash">curl "localhost:9200/metricbeat-*/_search?q=metricset.module:nginx&size=1&pretty"</pre>
+      </li>
+
+      <li>
+        Metrics are being collected and even though Metricbeat has no pre-built dashboard for nginx, we have created one for this exercise and you can load it with the following command:
+  <!-- curl http://localhost:5601/api/kibana/dashboards/export?dashboard=<DASH_ID> > datasets/kibana/nginx_dashboard.json -->
+        <pre class="bash">curl -i "http://localhost:5601/api/kibana/dashboards/import" -H 'Content-type: application/json' -H 'kbn-xsrf:true' -d @/home/ubuntu/datasets/kibana/nginx_dashboard.json</pre>
+      </li>
+
+      <li>
+        Now, go into Kibana and open the NGINX dashboard to answer the following questions:
+        <ul>
+          <li>What is the max connection status?</li>
+          <li>What is the maximum number of requests over time?</li>
+          <li>Do you see any strange behavior?</li>
+        </ul>
+
+        <i>(You might need to click Dashboard twice as, by default, Kibana loads the latest used Dashboard.)</i>
+        <div class="solution">
+          Unfortunately, there is a bug with 3 visualizations in the dashboard. We hope to get it fixed soon.
+          <img src="images/lab3_nginx_overview.png" />
+          The first two answers don't have a correct value, they depend on your machine. There are no strange behaviors so far. We were not monitoring nginx when we executed the artificial load.
+        </ul>
+        </div>
+      </li>
+
+      <li>
+        Another system you will monitor in this lab is MySQL. But before you start monitoring it, set <strong>reload.enable: true</strong> to enable the dynamic configuration reload of Metricbeat.
+        <div class="solution">
+          Open metricbeat.yml file, change reload.enable from false to true and restart Metricbeat.
+          <pre><code>reload.enabled: true</code></pre>
+          By enabling this option, Metricbeat will recognize configuration changes and automatically apply them (without the need to stop and start Metricbeat).
+        </div>
+      </li>
+
+      <li>
+        Next, configure MySQL module credentials (user: ubuntu and pass: elastic). Then, enable the mysql module (remove the .disable from the mysql config file name) and start metricbeat.
+
+        <div class="solution">
+          <pre class="bash">vim modules.d/mysql.yml.disabled</pre>
+          <pre><code>hosts: ["ubuntu:elastic@tcp(127.0.0.1:3306)/"]</code></pre>
+          <pre class="bash">mv modules.d/mysql.yml.disabled modules.d/mysql.yml<br>
+          ./metricbeat</pre>
+        </div>
+      </li>
+
+      <li>
+        Check if the MySQL data is really going to Elasticsearch and does not contain an error.
+        <div class="solution">
+          <pre class="bash">curl "localhost:9200/metricbeat-*/_search?q=metricset.module:mysql&size=1&pretty"</pre>
+          If there is a connection problem or wrong user/password you will see an error field with an error message.
+        </div>
+      </li>
+
+      <li>
+        Open the Metricbeat MySQL dashboard in Kibana and explore it.Run the artificial load script to generate some mysql and nginx data.
+        <i>(You might need to click Dashboard twice as, by default, Kibana loads the latest used Dashboard.)</i>
+
+        <div class="solution">
+          <img src="images/lab3_mysql1.png" />
+          <img src="images/lab3_mysql2.png" />
+        </div>
+      </li>
+    </ol>
+
+    <p>
+      <strong>Summary:</strong> Besides pinging Elastic website with heartbeart and collecting metrics from the operating system, now you are also collecting metrics from MySQL and nginx. All you did was change a few lines in the configuration file. Also, pre-built dashboards can give you a quick insight into those services.
+    </p>
+    <hr/>
+
+
+
+        <!-- ******************************************************************************* -->
+
+
+
+
+    <a name="lab4"></a>
+    <h2>Lab 4: Ingesting File Data</h2>
+
+    <p>
+      <strong>Objective:</strong> In this lab you will use Logstash and Filebeat to ingest single and multi-line events.
+    </p>
+
+    <ol>
+
+      <li>
+        First, we need a dataset. Let's start simple. We have a csv file with the world population per country and regions from 1960 to 2016 [1]. The file can be found in the <kbd class="path">datasets</kbd> directory: <kbd class="path">datasets/world_population/world_population_1960-2016.csv</kbd>. The following snippet shows the header line with the column names and the data of the first country in this file:
+
+        <pre><code>"Country Name","Country Code","Indicator Name","Indicator Code","1960","1961","1962","1963","1964","1965","1966","1967","1968","1969","1970","1971","1972","1973","1974","1975","1976","1977","1978","1979","1980","1981","1982","1983","1984","1985","1986","1987","1988","1989","1990","1991","1992","1993","1994","1995","1996","1997","1998","1999","2000","2001","2002","2003","2004","2005","2006","2007","2008","2009","2010","2011","2012","2013","2014","2015","2016",
+"Aruba","ABW","Population, total","SP.POP.TOTL","54211","55438","56225","56695","57032","57360","57715","58055","58386","58726","59063","59440","59840","60243","60528","60657","60586","60366","60103","59980","60096","60567","61345","62201","62836","63026","62644","61833","61079","61032","62149","64622","68235","72504","76700","80324","83200","85451","87277","89005","90853","92898","94992","97017","98737","100031","100832","101220","101353","101453","101669","102053","102577","103187","103795","104341","104822",</code></pre>
+
+        [1] The World Bank - http://data.worldbank.org/indicator/SP.POP.TOTL
+      </li>
+
+      <li>
+        Your first task is to use Filebeat to ingest this file. Also, instead of using the default output index, configure Filebeat to write to an index called <kbd class="index">fb_world_population</kbd> using the following config:
+        
+        <pre><code>output.elasticsearch.index: "fb_world_population"
+setup.template.name: "fb_world_population"
+setup.template.pattern: "fb_world_population"</code></pre>
+
+        <div class="solution">
+          Edit <kbd class="path">filebeat.yml</kbd>:
+          <pre><code>filebeat.prospectors:
+  - type: log
+    enabled: true
+    paths:
+      - /home/ubuntu/datasets/world_population/world_population_1960-2016.csv
+output.elasticsearch:
+  hosts: ["localhost:9200"]
+  index: "fb_world_population"
+
+output.elasticsearch.index: "fb_world_population"
+setup.template.name: "fb_world_population"
+setup.template.pattern: "fb_world_population"</code></pre>
+          From the <kbd class="path">filebeat</kbd> directory run:
+          <pre class="bash">./filebeat test config<br>./filebeat test output<br>./filebeat</pre>
+        </div>
+
+      </li>
+
+      <li>
+        Use Console to check if ingestion was successful. How many documents were ingested? Also, look into the structure of documents in Elasticsearch.
+
+        <div class="solution">
+          You should have 214 documents in the <kbd class="index">fb_world_population</kbd> index. Use <kbd class="console">GET fb_world_population/_search?q=country</kbd> to check this in your environment.
+          <img src="images/lab4_console_fb_search.png">
+        </div>
+
+      </li>
+
+      <li>
+        Maybe you have not noticed, but the header line was ingested into Elasticsearch (Use <kbd>GET fb_world_population/_search?q=country</kbd> to see that document). We don't want this line as a document and we should filter it out. Delete the <kbd class="index">fb_world_population</kbd> index and re-ingest the data, removing the first line.<br/>
+        Validate afterwards that you now have one less document.
+
+
+        <div class="solution">
+          Add the <kbd class="var">exclude_lines</kbd> option after the <kbd class="var">paths</kbd> definition of the prospector.
+          <pre><code>    exclude_lines: ['^"Country Name"']</code></pre>
+          Then, delete the index and the registry and start Filebeat again. Finaly check the number of documents ingested.
+          <pre class="bash">curl -XDELETE 'localhost:9200/fb_world_population'<br>rm data/registry<br>./filebeat<br>curl 'localhost:9200/fb_world_population/_count'</pre>
+          The result of the last command should be 213.
+        </div>
+
+      </li>
+
+      <li>
+        Ingest the data again, but now use Logstash and name the index <kbd class="index">ls_world_population</kbd>. <br/>
+        Some tips:
+        <ul>
+          <li>start with setting the output to <kbd class="var">stdout</kbd></li>
+          <li>after testing the input, change the output to <kbd class="var">elasticsearch</kbd></li>
+          <li>use the <kbd class="var">sincedb_path</kbd> and the <kbd class="var">start_position</kbd> file input options to speedup development</li>
+        </ul>
+
+        <div class="solution">
+          Create a config file (for example <kbd class="path">ls_world.conf</kbd>).
+          <pre><code>input {
+  file {
+    path => "/home/ubuntu/datasets/world_population/world_population_1960-2016.csv"
+    sincedb_path => "/dev/null"
+    start_position => "beginning"
+  }
+}
+
+filter {}
+
+output { stdout{ codec => rubydebug } }</code></pre>
+
+          Test:
+          <pre class="bash">./logstash/bin/logstash -f ls_world.conf</pre>
+          You should see output similar to this:
+          <img src="images/lab4_ls_output.png">
+          Update the config file to send the data to Elasticsearch. (Tip: add the <kbd class="var">dots</kbd> codec to <kbd class="var">stdout</kbd> to see ingestion progress in the terminal.)
+          <pre><code>output {
+  stdout { codec => 'dots' }
+  elasticsearch { index => 'ls_world_population' }
+}</code></pre>
+          Test:
+          <pre class="bash">./logstash/bin/logstash -f ls_world.conf<br>curl 'localhost:9200/ls_world_population/_count'</pre>
+          There should be 214 documents in the index.
+        </div>
+      </li>
+
+      <li>
+        Use Console to see what documents look like in Elasticseaerch.
+        <div class="solution">
+          <img src="images/lab4_console_ls_search.png">
+        </div>
+      </li>
+
+      <li>
+        Using logstash, we have the same problem with the header line that we saw earlier with Filebeat. Update the config file to remove the first line by using the <kbd class="var">drop</kbd> filter with a conditional. Next, delete the index and re-ingest the data.
+        <div class="solution">
+          In the config file replace the <kbd class="var">filter</kbd> section with:
+          <pre><code>filter {
+  if [message] =~ '^"Country Name"' {
+    drop {}
+  }
+}</code></pre>
+          Delete index, re-ingest data, test.
+          <pre class="bash">curl -XDELETE 'localhost:9200/ls_world_population'<br>./logstash/bin/logstash -f ls_world.conf<br>curl 'localhost:9200/ls_world_population/_count'</pre>
+          The result of the last command should be 213.
+        </div>
+      </li>
+
+      <li>
+        What is the difference between documents ingested with Filebeat and Logstash?
+        <div class="solution">
+          Documents created by both Filebeat and Logstash will have a <kbd class="var">message</kbd> field that contains the event data, a <kbd class="var">@timestamp</kbd> field with the ingestion time, and the full path of the monitored file (called <kbd class="var">source</kbd> in Filebeat and <kbd class="var">path</kbd> in Logstash). However, Filebeat adds a <kbd class="var">beat</kbd> object with <kbd class="var">version</kbd>, <kbd class="var">name</kbd>, and <kbd class="var">hostname</kbd>, a <kbd class="var">prospector</kbd> object and an <kbd class="var">offset</kbd> number. Logstash adds a <kbd class="var">@version</kbd> and the <kbd class="var">host</kbd>.<br/>
+          Filebeat document example:
+          <pre><code>{ "@timestamp": "2017-08-24T11:36:30.607Z", "source": "/home/ubuntu/datasets/world_population/world_population_1960-2016.csv", "message": "...", "beat": { "version": "6.0.0-beta1", "name": "ip-172-31-0-79", "hostname": "ip-172-31-0-79" }, "prospector": { "type": "log" }, "offset": 2314 }</code></pre>
+          Logstash document example:
+          <pre><code>{ "@timestamp": "2017-08-24T12:37:56.421Z", "path": "/home/ubuntu/datasets/world_population/world_population_1960-2016.csv", "message": "...", @version": "1", "host": "ip-172-31-0-79" }</code></pre>
+        </div>
+      </li>
+
+      <li>
+        Congrats, you finished the single line file input portion of the lab. <br/>
+        Next, we will focus on multi-line file input. We need a "new" dataset for that. Not really new, but with a different format :). We now have the same dataset in the form of an xml file (<kbd class="path">datasets/world_population/world_population_1960-2016.xml</kbd>):
+
+        <pre><code>&lt;?xml version="1.0" encoding="utf-8"?>
+&lt;Root xmlns:wb="http://www.worldbank.org">
+  &lt;data>
+    &lt;record>
+      &lt;field name="Country or Area" key="ABW">Aruba&lt;/field>
+      &lt;field name="Item" key="SP.POP.TOTL">Population, total&lt;/field>
+      &lt;field name="Year">1960&lt;/field>
+      &lt;field name="Value">54211&lt;/field>
+    &lt;/record>
+    &lt;record>
+      &lt;field name="Country or Area" key="ABW">Aruba&lt;/field>
+      &lt;field name="Item" key="SP.POP.TOTL">Population, total&lt;/field>
+      &lt;field name="Year">1961&lt;/field>
+      &lt;field name="Value">55438&lt;/field>
+    &lt;/record>
+    ...</code></pre>
+      </li>
+
+      <li>
+        Use the Filebeat <kbd class="var">multiline</kbd> option to ingest the new file so that each record entity will be a document in Elasticsearch. Name the index <kbd class="index">fb_xml_world_population</kbd> and use the following queries to verify:
+        <pre><code>GET fb_xml_world_population/_search
+GET fb_xml_world_population/_search?q=root|data</code></pre>
+
+        <div class="solution">
+          <pre><code>    paths:
+      - /home/ubuntu/datasets/world_population/world_population_1960-2016.xml
+
+    multiline.pattern: "^\\s+&lt;record&gt;|^\\s+&lt;/data&gt;"
+    multiline.negate: true
+    multiline.match: after</code></pre>
+
+          Notice, we added the <kbd>|^\\s+&lt;/data&gt;</kbd> in order to separate the data and root xml objects from the record object in the last event generated.
+        </div>
+      </li>
+
+      <li>
+        Use the Logstash <kbd class="var">multiline</kbd> codec to ingest the xml file so that each record entity is a document in Elasticsearch. Name the index <kbd>ls_xml_world_population</kbd> and use the following queries to verify:
+        <pre><code>GET ls_xml_world_population/_search
+GET ls_xml_world_population/_search?q=root|data</code></pre>
+
+        <div class="solution">
+          The multiline plugin is not shipped with logstash by default, so you need to install it:
+          <pre class="bash">./logstash/bin/logstash-plugin install logstash-filter-xml</pre>
+
+          Next, update the file input in the config file to read the xml file and to use the multiline codec:
+          <pre><code>input {
+  file {
+    path => "/home/ubuntu/datasets/world_population/world_population_1960-2016.xml"
+    sincedb_path => "/dev/null"
+    start_position => "beginning"
+    codec => multiline {
+      pattern => "^\s+&lt;record&gt;|^\s+&lt;/data&gt;"
+      negate => true
+      what => previous
+      auto_flush_interval => 1
+    }
+  }
+}</code></pre>
+          Notice, we added the <kbd>|^\s+&lt;/data&gt;</kbd> in order to separate the data and root xml objects from the record object in the last event generated.
+        </div>
+      </li>
+
+      <li>
+        Looking into the documents do you think they are good for searching and analyzing the data? Why?
+        <div class="solution">
+          No, the current documents are not good for searching and analyzing. The current documents are unstructured as they have all the information in one single field called message. In order to easily answer questions like "Which country had the biggest population in 1990?" and "Which country had the biggest population increase in the last 7 years?", you need to parse the <kbd class="var">message</kbd> field and create a structured document. That is what we are going to learn next.
+        </div>
+      </li>
+    </ol>
+
+    <p>
+      <strong>Summary:</strong> In this lab you ingested data from a CSV file using both Filebeat and Logstash. You also ingested data from a xml file and handled multilines. However, the documents indexed to Elasticsearch have a single field called message that contains the entire event data. Next, we will learn how to process data to create a document structure and improve analysis.
+    </p>
+    <hr/>
+
+
+
+        <!-- ******************************************************************************* -->
+
+
+
+
+    <a name="lab5"></a>
+    <h2>Lab 5: Data Processing</h2>
+
+    <p>
+      <strong>Objective:</strong> In the previous lab the documents indexed to Elasticsearch had a single field called <kbd class="var">message</kbd>. In this lab, you will use Logstash filters to create structured documents. We will see how to do simple mutations, how to parse a csv file with two different filters (<kbd class="var">csv</kbd> and <kbd class="var">dissect</kbd>) and then look up information from a file.
+    </p>
+
+    <ol>
+      <li>
+        Before we start working with filters we need to understand the data and which transformations we want to do to it. Take some time to analyze the current structure of the documents and think about what the final structure should be, and which filters we should apply to achieve that.
+        <pre><code>{
+    "@version": "1",
+    "host": "ip-172-31-0-79",
+    "path": "/home/ubuntu/datasets/world_population/world_population_1960-2016.csv",
+    "@timestamp": "2017-08-24T12:37:56.421Z",
+    "message": """"Benin","BEN","Population, total","SP.POP.TOTL","2431622","2465867","2502896","2542859","2585965","2632356","2682159","2735307","2791590","2850661","2912340","2976572","3043567","3113675","3187412","3265165","3347173","3433439","3523938","3618526","3717165","3820128","3927714","4039949","4156819","4278501","4404506","4535263","4672852","4820016","4978496","5149499","5331803","5521763","5714220","5905558","6094259","6281639","6470265","6664098","6865951","7076733","7295394","7520555","7750004","7982225","8216896","8454791","8696916","8944706","9199259","9460802","9729160","10004451","10286712","10575952","10872298","""
+  }
+}</code></pre>
+        <i>Notice that Elasticsearch allows the use of three double quotes (""") when quotes are part of the value.</i>
+
+        <div class="solution">
+          We need to break up the <kbd class="var">message</kbd> field, which has comma separated values. We can also remove useless fields like <kbd class="var">@version</kbd>, <kbd class="var">host</kbd>, and <kbd class="var">@timestamp</kbd>. We could also look up extra information (latitude and longitude, for example) from another file and enrich our documents with that extra information.<br/>
+          The resulting documents would look something like this:
+          <pre><code>{
+"path": "/home/ubuntu/datasets/world_population/world_population_1960-2016.csv",
+"country": "Benin",
+"country_code:: "BEN",
+"geo_location": "9.30769,2.315834",
+"population": {
+  "1960": 2431622,
+  "1961": 2465867,
+  ...
+  "2016": 10872298
+}
+</code></pre>
+        </div>
+      </li>
+
+      <li>
+         To better work with filters let's set up Logstash in a way that makes it very easy to develop and test a pipeline. Create a new Logstash configuration file <kbd class="path">ls_world_population_csv.conf</kbd> and use the <kbd class="var">input</kbd> from the previous lab where you ingested data from the csv file with <kbd class="var">since_db</kbd> and <kbd class="var">start_position</kbd>. Set the <kbd class="var">output</kbd> to standard out instead of Elasticsearch for now. The <kbd class="var">rubydebug</kbd> codec will help you better visualize the generated events.
+        <div class="solution">
+          <pre><code>input {
+  file {
+    path => "/home/ubuntu/datasets/world_population/world_population_1960-2016.csv"
+    sincedb_path => "/dev/null"
+    start_position => "beginning"
+  }
+}
+
+filter {}
+
+output {
+  stdout { codec => rubydebug }
+}</code></pre>
+        </div>
+      </li>
+
+      <li>
+        Start logstash using the automatic reload flag.
+        <div class="solution">
+          <pre><code>./logstash/bin/logstash -f ls_world_population_csv.conf --config.reload.automatic</code></pre>
+          You should see the following output:
+          <img src="images/lab5_ls_output1.png">
+        </div>
+      </li>
+
+      <li>
+        Remember how to remove the header field from the previous lab? Add the required filter to the Logstash configuration.<br/><br/>
+        Next, we will add filters one at a time until we have the desired output. First, use the <kbd class="var">csv</kbd> filter to break <kbd class="var">message</kbd> field into separate fields.<br>
+        <i>Tip: Copy the CSV header to speed up configuration. Also, if you enabled automatic reload you will see Logstash re-process the file a few seconds after you save the config file.</i>
+        <div class="solution">
+          Replace the <kbd class="var">filter</kbd> section with the following:
+          <pre><code>filter {
+  if [message] =~ '^"Country Name"' {
+    drop {}
+  }
+  csv {
+    columns => [ "country","country_code","dummy1","dummy2","population[1960]","population[1961]","population[1962]","population[1963]","population[1964]","population[1965]","population[1966]","population[1967]","population[1968]","population[1969]","population[1970]","population[1971]","population[1972]","population[1973]","population[1974]","population[1975]","population[1976]","population[1977]","population[1978]","population[1979]","population[1980]","population[1981]","population[1982]","population[1983]","population[1984]","population[1985]","population[1986]","population[1987]","population[1988]","population[1989]","population[1990]","population[1991]","population[1992]","population[1993]","population[1994]","population[1995]","population[1996]","population[1997]","population[1998]","population[1999]","population[2000]","population[2001]","population[2002]","population[2003]","population[2004]","population[2005]","population[2006]","population[2007]","population[2008]","population[2009]","population[2010]","population[2011]","population[2012]","population[2013]","population[2014]","population[2015]","population[2016]" ]
+  }
+}</code></pre>
+
+          The output should look like the following. (Output order is not guaranteed.)
+          <img src="images/lab5_ls_output2.png">
+        </div>
+      </li>
+
+      <li>
+        Another way of parsing a CSV file is to use the <kbd class="var">dissect</kbd> filter, which is <a href="https://www.elastic.co/blog/logstash-dude-wheres-my-chainsaw-i-need-to-dissect-my-logs">faster than the <kbd class="var">csv</kbd> filter</a>. Update the config file to use the <kbd class="var">dissect</kbd> instead of the <kbd class="var">csv</kbd> filter.
+        <div class="solution">
+          <pre><code>filter {
+  if [message] =~ '^"Country Name"' {
+    drop {}
+  }
+  dissect {
+    mapping => {
+      "message" => '"%{country}","%{country_code}","%{}","%{}","%{population[1960]}","%{population[1961]}","%{population[1962]}","%{population[1963]}","%{population[1964]}","%{population[1965]}","%{population[1966]}","%{population[1967]}","%{population[1968]}","%{population[1969]}","%{population[1970]}","%{population[1971]}","%{population[1972]}","%{population[1973]}","%{population[1974]}","%{population[1975]}","%{population[1976]}","%{population[1977]}","%{population[1978]}","%{population[1979]}","%{population[1980]}","%{population[1981]}","%{population[1982]}","%{population[1983]}","%{population[1984]}","%{population[1985]}","%{population[1986]}","%{population[1987]}","%{population[1988]}","%{population[1989]}","%{population[1990]}","%{population[1991]}","%{population[1992]}","%{population[1993]}","%{population[1994]}","%{population[1995]}","%{population[1996]}","%{population[1997]}","%{population[1998]}","%{population[1999]}","%{population[2000]}","%{population[2001]}","%{population[2002]}","%{population[2003]}","%{population[2004]}","%{population[2005]}","%{population[2006]}","%{population[2007]}","%{population[2008]}","%{population[2009]}","%{population[2010]}","%{population[2011]}","%{population[2012]}","%{population[2013]}","%{population[2014]}","%{population[2015]}","%{population[2016]}"%{}'
+    }
+  }
+}</code></pre>
+          Notice that we are using the skip field notation (<kbd>%{}</kbd>) as we are not interested in some of the values. Also, different from the <kbd class="var">csv</kbd> filter, the <kbd class="var">dissect</kbd> filter appends the remaining text to the last field. Therefore, we also add a skip field notation to the end of the pattern.
+        </div>
+      </li>
+
+      <li>
+        Next, update the Logstash config file to remove useless fields like <kbd class="var">host</kbd>, <kbd class="var">@timestamp</kbd>, <kbd class="var">@version</kbd>, and <kbd class="var">message</kbd>. Depending on if you are using <kbd class="var">csv</kbd> or <kbd class="var">dissect</kbd> and how you implemented the dissect parsing, you should also remove the indicator name and indicator code. Removing useless fields requires a bit of extra Logstash processing, but you reduce network usage, Elasticsearch processing time, and Elasticsearch storage.
+        <div class="solution">
+          Add the following filter after the <kbd class="var">csv</kbd> (or <kbd class="var">dissect</kbd>) filter:
+          <pre><code>  mutate {
+    remove_field => [ "host", "message", "@version", "@timestamp" ]
+  }</code></pre>
+          You should see the following output:
+          <img src="images/lab5_ls_output3.png">
+        </div>
+      </li>
+
+      <li>
+        Elasticsearch mappings define the data types of fields in your documents. You can set mappings manually or by using index templates. You can also let Elasticsearch dynamically guess your field types, called dynamic mapping. The problem with guessing is that in a document like <kbd>{ "1960": "200870" }</kbd> the field "1960" will be mapped as a string and not a number. <br/>
+        Let's update our Logstash config such that Logstash will send Elasticsearch numbers instead of strings. This will result in a better mapping of our numeric fields. You can use the <kbd class="var">mutate</kbd> filter to convert values into integer, float, string, and boolean. Convert the yearly populations to integer.
+
+        <div class="solution">
+          Add the following filter after the <kbd class="var">csv</kbd> (or <kbd class="var">dissect</kbd>) filter:
+          <pre><code> mutate {
+            convert => { "population[1960]" => "integer" "population[1961]" => "integer" "population[1962]" => "integer" "population[1963]" => "integer" "population[1964]" => "integer" "population[1965]" => "integer" "population[1966]" => "integer" "population[1967]" => "integer" "population[1968]" => "integer" "population[1969]" => "integer" "population[1970]" => "integer" "population[1971]" => "integer" "population[1972]" => "integer" "population[1973]" => "integer" "population[1974]" => "integer" "population[1975]" => "integer" "population[1976]" => "integer" "population[1977]" => "integer" "population[1978]" => "integer" "population[1979]" => "integer" "population[1980]" => "integer" "population[1981]" => "integer" "population[1982]" => "integer" "population[1983]" => "integer" "population[1984]" => "integer" "population[1985]" => "integer" "population[1986]" => "integer" "population[1987]" => "integer" "population[1988]" => "integer" "population[1989]" => "integer" "population[1990]" => "integer" "population[1991]" => "integer" "population[1992]" => "integer" "population[1993]" => "integer" "population[1994]" => "integer" "population[1995]" => "integer" "population[1996]" => "integer" "population[1997]" => "integer" "population[1998]" => "integer" "population[1999]" => "integer" "population[2000]" => "integer" "population[2001]" => "integer" "population[2002]" => "integer" "population[2003]" => "integer" "population[2004]" => "integer" "population[2005]" => "integer" "population[2006]" => "integer" "population[2007]" => "integer" "population[2008]" => "integer" "population[2009]" => "integer" "population[2010]" => "integer" "population[2011]" => "integer" "population[2012]" => "integer" "population[2013]" => "integer" "population[2014]" => "integer" "population[2015]" => "integer" "population[2016]" => "integer" }
+  }</code></pre>
+          You should see the following output:
+          <img src="images/lab5_ls_output4.png">
+        </div>
+      </li>
+
+      <li>
+        Adding extra information to your documents allows you to execute better analysis. It would for example be nice to have information like geo coordinates based on the country name. Use the <kbd class="var">translate</kbd> filter to read information from the <kbd class="path">country_geo_lookup.csv</kbd> file and add it to a new field called <kbd class="var">geo_location</kbd>. Use the <kbd class="var">fallback</kbd> setting to set the coordinates to <kbd>"0,0"</kbd> if there is no translation.
+        <div class="solution">
+          <pre><code>  translate {
+    field => "country"
+    dictionary_path => "/home/ubuntu/datasets/world_population/countries_lat_lon.csv"
+    destination => "geo_location"
+    fallback => "0,0"
+  }</code></pre>
+          You should see the following output:
+          <img src="images/lab5_ls_output5.png">
+        </div>
+      </li>
+
+      <li>
+        Documents are now enhanced with a <kbd class="field">geo_location</kbd> field and are ready to be sent to Elasticsearch. However <kbd class="field">geo_location</kbd> would be dynamically mapped as a string as the value is within quotes. In order to use <kbd class="field">geo_location</kbd> as a <kbd class="var">geo_point</kbd>, you need to map it as one. Go to Console and execute the follwoing command:
+        <pre><code>PUT world_population
+{
+  "settings": {
+    "number_of_shards": 1
+  },
+  "mappings": {
+    "logs": {
+      "properties": {
+        "geo_location": {
+          "type": "geo_point"
+        }
+      }
+    }
+  }
+}</code></pre>
+      </li>
+
+      <li>
+        Now that Logstash output events look good and we have defined the mapping for our index, change the output to <kbd class="var">elasticsearch</kbd> and use <kbd class="index">world_population</kbd> as the index name. Afterwards, test if files are in Elasticsearch and look like expected. You should have a total of 213 documents.
+        <pre><code>curl 'localhost:9200/world_population/_search'</code></pre>
+
+        <div class="solution">
+          <pre><code>output {
+  stdout { codec => 'dots' }
+  elasticsearch { index => 'world_population' }
+}</code></pre>
+        </div>
+      </li>
+
+      <li>
+        Time to analyze data. Load a pre-built dashboard to explore the world population in the last 60 years.
+  <!-- curl http://localhost:5601/api/kibana/dashboards/export?dashboard=<DASH_ID> > datasets/kibana/world_population_dashboard.json -->
+        <pre class="bash">curl -i "http://localhost:5601/api/kibana/dashboards/import" -H 'Content-type: application/json' -H 'kbn-xsrf:true' -d @datasets/kibana/world_population_dashboard.json</pre>
+        Now, open the World Population dashboard to answer the following questions:
+        <ul>
+          <li>What was the total world total population in 2016? <div class="solution">7,408,884,872</div></li>
+          <li>How many countries account for 50% of the world population? <div class="solution">Approximately 6.</div></li>
+          <li>
+            What are currently the top 5 countries in population?
+            <div class="solution">China, India, United States, Indonesia, and Brazil.</div>
+          </li>
+          <li>
+            Which were the top five countries in 2000, 1980, and 1960?
+            <div class="solution">
+              2000: China, India, United States, Indonesia, and Brazil.<br>
+              1980: China, India, United States, Indonesia, and Russian Federation.<br>
+              1960: China, India, United States, Russian Federation, and Indonesia.<br>
+            </div>
+          </li>
+          <li>
+            Which is the country with the highest relative increase in population?
+            <div class="solution">Pakistan with 330.2% increase.</div>
+          </li>
+        </ul>
+      </li>
+
+      <!--
+      <li>
+        <i>Optional:</i> A word on entity centric data. (TODO:)
+        <div class="solution">
+          .............
+        </div>
+      </li>
+      -->
+
+    </ol>
+    <p>
+      <strong>Summary:</strong> In this lab you used Logstash to tranform unstructured data into structured data. First you split one single field into multiple fields using the <kbd class="var">csv</kbd> and the <kbd class="var">dissect</kbd> filters. Second, you removed useless fields added by Logstash and present in the data. Third, you converted string fields into integers as it was numeric data. Finally, you enhanced the data by looking up country coordinates in another CSV file. After executing the steps in this lab you have improved your ability to analyze the dataset and answer different questions.
+    </p>
+    <hr/>
+
+
+
+
+        <!-- ******************************************************************************* -->
+
+
+
+
+
+    <a name="lab6"></a>
+    <h2>Lab 6: Data Enrichment</h2>
+    <p>
+      <strong>Objective:</strong> In the previous lab you processed a csv file. In this lab, you will explore a new dataset. You will use Logstash to ingest, process and enrich an Apache web server log file with 300,000 log entries to Elasticsearch. And then Explore the data in Kibana.
+    </p>
+
+    <ol>
+
+      <li>
+        Similar to the previous exercise, you will ingest raw data from a file and enrich each log line using different filters. In order to accomplish this, we will be using a configuration file similar to the previous exercise.
+
+        Let's set up Logstash in a way that makes it very easy to develop and test a pipeline.
+        <ul>
+          <li>
+            Create a new Logstash configuration file <kbd class="path">ls_apache.conf</kbd>
+          </li>
+          <li>
+            Configure the <kbd class="var">file input</kbd>plugin to read from <kbd class="path">/home/ubuntu/datasets/apache/sample.log</kbd>.
+          </li>
+          <li>
+            Rememeber to set <kbd class="var">since_db</kbd> and <kbd class="var">start_position</kbd> parameters.
+          </li>
+          <li>
+            Also, set the <kbd class="var">output</kbd> to standard output instead of Elasticsearch in order to validate the output.
+          </li>
+          <li>
+            Finally, set the <kbd class="var">rubydebug</kbd> codec to help you better visualize the generated events in standard output.
+          </li>
+        </ul>
+        <div class="solution">
+          <pre><code>input {
+  file {
+    path => "/home/ubuntu/datasets/apache/sample.log"
+    sincedb_path => "/dev/null"
+    start_position => "beginning"
+  }
+}
+
+filter {}
+
+output {
+  stdout { codec => rubydebug }
+}</code></pre>
+        </div>
+      </li>
+
+      <li>
+        Start Logstash with the reload flag.
+
+        YIf configurations are correct, you should start seeing snippets of data on Logstash output console as below:
+          <pre><code>{
+      "@version" => "1",
+          "host" => "ip-172-31-0-79",
+          "path" => "/home/ubuntu/datasets/apache/sample.log",
+    "@timestamp" => 2017-09-30T17:21:45.252Z,
+       "message" => "83.149.9.216 - - [26/Aug/2014:21:13:42 +0000] \"GET /presentations/logstash-monitorama-2013/images/kibana-search.png HTTP/1.1\" 200 203023 \"http://semicomplete.com/presentations/logstash-monitorama-2013/\" \"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/32.0.1700.77 Safari/537.36\""
+}</code></pre>
+
+        <div class="solution">
+          You can use --config.reload.automatic or simply -r.
+          <pre class="bash">./logstash/bin/logstash -f ls_apache.conf -r</pre>
+        </div>
+      </li>
+
+      <li>
+        Now that we have Logstash configured to read apache log file and print output to the terminal we can start building our filters. We will start with a grok filter. The grok filter will parse each log entry and break it into separate fields. In the Logstash configuration file, add the following grok configuration under the filter section:
+        <pre><code>  grok {
+    match => {
+      "message" => '%{IPORHOST:clientip} %{USER:ident} %{USER:auth} \[%{HTTPDATE:timestamp}\] %{GREEDYDATA:msg}'
+    }
+  }</code></pre>
+        Now, save the config file and check logstash output. There is no need to restart Logstash for the configuration changes to take effect. Because you started Logstash with the <kbd>-r</kbd> flag, it will automatically reload configuration file and pick up any changes. Note that the logstash output looks a bit more structured now:
+        <pre><code>{
+           "msg" => "\"GET /presentations/logstash-monitorama-2013/images/kibana-search.png HTTP/1.1\" 200 203023 \"http://semicomplete.com/presentations/logstash-monitorama-2013/\" \"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/32.0.1700.77 Safari/537.36\"",
+          "path" => "/home/ubuntu/datasets/apache/sample.log",
+    "@timestamp" => 2017-09-30T17:32:25.639Z,
+          "auth" => "-",
+         "ident" => "-",
+      "clientip" => "83.149.9.216",
+      "@version" => "1",
+          "host" => "ip-172-31-0-79",
+       "message" => "83.149.9.216 - - [26/Aug/2014:21:13:42 +0000] \"GET /presentations/logstash-monitorama-2013/images/kibana-search.png HTTP/1.1\" 200 203023 \"http://semicomplete.com/presentations/logstash-monitorama-2013/\" \"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/32.0.1700.77 Safari/537.36\"",
+     "timestamp" => "26/Aug/2014:21:13:42 +0000"
+}</code></pre>
+
+        <div class="solution">
+          This grok filter parses each log line into separate <kbd>clientip</kbd>, <kbd>ident</kbd>, <kbd>auth</kbd>, <kbd>timestamp</kbd> and <kbd>msg</kbd> fields. The resulting full configuration file should now be:
+          <pre><code>input {
+  file {
+    path => "/home/ubuntu/datasets/apache/sample.log"
+    sincedb_path => "/dev/null"
+    start_position => "beginning"
+  }
+}
+
+filter {
+  <b>grok {
+    match => {
+      "message" => '%{IPORHOST:clientip} %{USER:ident} %{USER:auth} \[%{HTTPDATE:timestamp}\] %{GREEDYDATA:msg}'
+    }
+  }</b>
+}
+
+output {
+  stdout { codec => rubydebug }
+}</code></pre>
+        </div>
+      </li>
+
+      <li>
+        This works, but our grok filter is quite complex. Let's simplify our grok filter. Logstash comes with a number of pre-configured patterns for common log formats, including one for Apache web server access logs, called: <kbd>COMBINEDAPACHELOG</kbd>. Update the grok configuration to use this <kbd>COMBINEDAPACHELOG</kbd> pattern.
+
+        <div class="solution">
+          The grok filter configuration should look like:
+          <pre><code>  grok {
+    match => {
+      "message" => '%{COMBINEDAPACHELOG}'
+    }
+  }</code></pre>
+
+          The full configuration file should now be:
+          <pre><code>input {
+  file {
+    path => "/home/ubuntu/datasets/apache/sample.log"
+    sincedb_path => "/dev/null"
+    start_position => "beginning"
+  }
+}
+
+filter {
+  <b>grok {
+    match => {
+      "message" => '%{COMBINEDAPACHELOG}'
+    }
+  }</b>
+}
+
+output {
+  stdout { codec => rubydebug }
+}</code></pre>
+        </div>
+      </li>
+
+      <li>
+        Next, we will also add some filters to transform and enrich our log entries. Because the <kbd>COMBINEDAPACHELOG</kbd> filter outputs the <kbd>bytes</kbd> field as a string. Let's add a <kbd>mutate</kbd> filter that converts this field to an integer.
+
+        <div class="solution">
+          The mutate filter configuration should look like this:
+          <pre><code>  mutate {
+    convert => { "bytes" => "integer" }
+  }</code></pre>
+
+          The full configuration file should now be:
+          <pre><code>input {
+  file {
+    path => "/home/ubuntu/datasets/apache/sample.log"
+    sincedb_path => "/dev/null"
+    start_position => "beginning"
+  }
+}
+
+filter {
+  grok {
+    match => {
+      "message" => '%{COMBINEDAPACHELOG}'
+    }
+  }
+  <b>mutate {
+    convert => { "bytes" => "integer" }
+  }</b>
+}
+
+output {
+  stdout { codec => rubydebug }
+}</code></pre>
+        </div>
+
+      </li>
+
+      <li>
+        Parsing date fields properly is extremely critical to timeseries data such as logs. Let's add a date filter, to parse and normalize the <kbd>timestamp</kbd> field from Apache web server logs and set it as the value of the <kbd>@timestamp</kbd> field, so that we can easily use it for visualizations in Kibana later.
+
+        <div class="solution">
+          The date filter configuration should look like:
+          <pre><code>  date {
+    match => [ "timestamp", "dd/MMM/YYYY:HH:mm:ss Z" ]
+    locale => en
+    remove_field => "timestamp"
+  }</code></pre>
+
+          The full configuration file should now be:
+          <pre><code>input {
+  file {
+    path => "/home/ubuntu/datasets/apache/sample.log"
+    sincedb_path => "/dev/null"
+    start_position => "beginning"
+  }
+}
+
+filter {
+  grok {
+    match => {
+      "message" => '%{COMBINEDAPACHELOG}'
+    }
+  }
+  mutate {
+    convert => { "bytes" => "integer" }
+  }
+  <b>date {
+    match => [ "timestamp", "dd/MMM/YYYY:HH:mm:ss Z" ]
+    locale => en
+    remove_field => "timestamp"
+  }</b>
+}
+
+output {
+  stdout { codec => rubydebug }
+}</code></pre>
+        </div>
+      </li>
+
+      <li>
+        Let's add a <kbd>geoip</kbd> filter to enrich our logs by adding geographical information to each log entry, based on a visitor's IP address.
+
+        <div class="solution">
+          The geoip filter configuration should look like:
+          <pre><code>  geoip {
+    source => "clientip"
+  }</code></pre>
+
+          The full configuration file should now be:
+          <pre><code>input {
+  file {
+    path => "/home/ubuntu/datasets/apache/sample.log"
+    sincedb_path => "/dev/null"
+    start_position => "beginning"
+  }
+}
+
+filter {
+  grok {
+    match => {
+      "message" => '%{COMBINEDAPACHELOG}'
+    }
+  }
+  mutate {
+    convert => { "bytes" => "integer" }
+  }
+  date {
+    match => [ "timestamp", "dd/MMM/YYYY:HH:mm:ss Z" ]
+    locale => en
+    remove_field => "timestamp"
+  }
+  <b>geoip {
+    source => "clientip"
+  }</b>
+}
+
+output {
+  stdout { codec => rubydebug }
+}</code></pre>
+        </div>
+      </li>
+
+      <li>
+        Let's also add information about each visitor's device, web browser and operating system to each log entry, based on their user agent information. This can be done by configuring a <kbd>useragent</kbd> filter.
+
+        <div class="solution">
+          The useragent filter configuration should look like:
+          <pre><code>  useragent {
+    source => "agent"
+    target => "useragent"
+  }</code></pre>
+
+          The full configuration file should now be:
+          <pre><code>input {
+  file {
+    path => "/home/ubuntu/datasets/apache/sample.log"
+    sincedb_path => "/dev/null"
+    start_position => "beginning"
+  }
+}
+
+filter {
+  grok {
+    match => {
+      "message" => '%{COMBINEDAPACHELOG}'
+    }
+  }
+  mutate {
+    convert => { "bytes" => "integer" }
+  }
+  date {
+    match => [ "timestamp", "dd/MMM/YYYY:HH:mm:ss Z" ]
+    locale => en
+    remove_field => "timestamp"
+  }
+  geoip {
+    source => "clientip"
+  }
+  <b>useragent {
+    source => "agent"
+    target => "useragent"
+  }</b>
+}
+
+output {
+  stdout { codec => rubydebug }
+}</code></pre>
+        </div>
+      </li>
+
+      <li>
+        The Apache web server access logs that we have provided are quite old (from 2014). It would be more interesting to analyze and visualize logs if the logs were more recent. So for the purposes of training, let's use a trick to make these old logs current. We can accomplish that by shifting all the timestamps in the events so that it will seem like the logs are from the last 30 days.
+
+        To do that, we will use a <kbd>ruby</kbd> filter. A <kbd>ruby</kbd> filter is a filter that allows you to do advanced data transformation by providing a piece of code that is written in the Ruby programming language.
+
+        The ruby filter configuration should look like:
+          <pre><code>  ruby {
+    init => "last = ::Time.parse('2014-09-25T04:00:00+00:00'); @shift = ::Time.now - last"
+    code => "event.set('@timestamp', LogStash::Timestamp.new(event.get('@timestamp') + @shift))"
+  }</code></pre>
+
+        <div class="solution">
+          The full configuration file should now be:
+          <pre><code>input {
+  file {
+    path => "/home/ubuntu/datasets/apache/sample.log"
+    sincedb_path => "/dev/null"
+    start_position => "beginning"
+  }
+}
+
+filter {
+  grok {
+    match => {
+      "message" => "%{COMBINEDAPACHELOG}"
+    }
+  }
+  mutate {
+    convert => { "bytes" => "integer" }
+  }
+  date {
+    match => [ "timestamp", "dd/MMM/YYYY:HH:mm:ss Z" ]
+    locale => en
+    remove_field => "timestamp"
+  }
+  geoip {
+    source => "clientip"
+  }
+  useragent {
+    source => "agent"
+    target => "useragent"
+  }
+  ruby {
+    init => "last = ::Time.parse('2014-09-25T04:00:00+00:00'); @shift = ::Time.now - last"
+    code => "event.set('@timestamp', LogStash::Timestamp.new(event.get('@timestamp') + @shift))"
+  }
+}
+
+output { stdout { codec => rubydebug } }</code></pre>
+        </div>
+      </li>
+
+      <li>
+        Let's take a look into the current event structure in your terminal. Are there fields that could be removed? By removing useless fields at ingestion time you tipycally reduce network bandwidth, disk usage, and Elasticsearch indexing time.
+
+        <div class="solution">
+          The @version, message and path fields are useless in this case and could be removed.
+          The current terminal output should look like:
+          <pre><code>{
+        "request" => "/presentations/logstash-monitorama-2013/images/kibana-search.png",
+          "agent" => "\"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/32.0.1700.77 Safari/537.36\"",
+          "geoip" => {
+              "timezone" => "Europe/Moscow",
+                    "ip" => "83.149.9.216",
+              "latitude" => 55.7485,
+        "continent_code" => "EU",
+             "city_name" => "Moscow",
+          "country_name" => "Russia",
+         "country_code2" => "RU",
+         "country_code3" => "RU",
+           "region_name" => "Moscow",
+              "location" => {
+                      "lon" => 37.6184,
+                      "lat" => 55.7485
+              },
+           "postal_code" => "101194",
+           "region_code" => "MOW",
+             "longitude" => 37.6184
+           },
+           "auth" => "-",
+          "ident" => "-",
+           "verb" => "GET",
+      "useragent" => {
+           "patch" => "1700",
+              "os" => "Mac OS X",
+           "major" => "32",
+           "minor" => "0",
+           "build" => "",
+        "os_minor" => "9",
+        "os_major" => "10",
+            "name" => "Chrome",
+         "os_name" => "Mac OS X",
+          "device" => "Other"
+    },
+        "message" => "83.149.9.216 - - [26/Aug/2014:21:13:42 +0000] \"GET /presentations/logstash-monitorama-2013/images/kibana-search.png HTTP/1.1\" 200 203023 \"http://semicomplete.com/presentations/logstash-monitorama-2013/\" \"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/32.0.1700.77 Safari/537.36\"",
+           "path" => "/home/ubuntu/datasets/apache/sample.log",
+       "referrer" => "\"http://semicomplete.com/presentations/logstash-monitorama-2013/\"",
+     "@timestamp" => 2017-09-02T05:27:04.166Z,
+       "response" => "200",
+          "bytes" => 203023,
+       "clientip" => "83.149.9.216",
+       "@version" => "1",
+           "host" => "ip-172-31-0-79",
+    "httpversion" => "1.1"
+}</code></pre>
+        </div>
+      </li>
+
+      <li>
+        Use the mutate filter to remove the fields discussed in the previous exercise.
+
+        <div class="solution">
+          The mutate filter configuration should look like:
+          <pre><code>  mutate {
+    remove_field => [ "message", "@version", "path" ]
+  }</code></pre>
+          You could also add the remove_field to the existing mutate filter.
+
+          The full configuration file should now be:
+          <pre><code>input {
+  file {
+    path => "/home/ubuntu/datasets/apache/sample.log"
+    sincedb_path => "/dev/null"
+    start_position => "beginning"
+  }
+}
+
+filter {
+  grok {
+    match => {
+      "message" => "%{COMBINEDAPACHELOG}"
+    }
+  }
+  mutate {
+    convert => { "bytes" => "integer" }
+  }
+  date {
+    match => [ "timestamp", "dd/MMM/YYYY:HH:mm:ss Z" ]
+    locale => en
+    remove_field => "timestamp"
+  }
+  geoip {
+    source => "clientip"
+  }
+  useragent {
+    source => "agent"
+    target => "useragent"
+  }
+  ruby {
+    init => "last = ::Time.parse('2014-09-25T04:00:00+00:00'); @shift = ::Time.now - last"
+    code => "event.set('@timestamp', LogStash::Timestamp.new(event.get('@timestamp') + @shift))"
+  }
+  mutate {
+    remove_field => [ "message", "@version", "path" ]
+  }
+}
+
+output { stdout { codec => rubydebug } }</code></pre>
+        </div>
+      </li>
+
+      <li>
+        Congratuations, the output event looks great! Now, we can send it to Elasticsearch. Add <kbd>Elasticsearch</kbd> to the output.
+
+        Use the following query to check. The response should have one document.
+
+        <pre class="bash">curl localhost:9200/logstash-*/_search</pre>
+
+        <div class="solution">
+          The output configuration should look like:
+
+          <pre><code>output {
+  stdout {
+    codec => rubydebug
+  }
+  elasticsearch {}
+}
+          </code></pre>
+
+          The full configuration file should now be:
+          <pre><code>input {
+  file {
+    path => "/home/ubuntu/datasets/apache/sample.log"
+    sincedb_path => "/dev/null"
+    start_position => "beginning"
+  }
+}
+
+filter {
+  grok {
+    match => {
+      "message" => "%{COMBINEDAPACHELOG}"
+    }
+  }
+  mutate {
+    convert => { "bytes" => "integer" }
+  }
+  date {
+    match => [ "timestamp", "dd/MMM/YYYY:HH:mm:ss Z" ]
+    locale => en
+    remove_field => "timestamp"
+  }
+  geoip {
+    source => "clientip"
+  }
+  useragent {
+    source => "agent"
+    target => "useragent"
+  }
+  ruby {
+    init => "last = ::Time.parse('2014-09-25T04:00:00+00:00'); @shift = ::Time.now - last"
+    code => "event.set('@timestamp', LogStash::Timestamp.new(event.get('@timestamp') + @shift))"
+  }
+  mutate {
+    remove_field => [ "message", "@version", "path" ]
+  }
+}
+
+output {
+  stdout {
+    codec => rubydebug
+  }
+  elasticsearch {}
+}</code></pre>
+        </div>
+      </li>
+
+      <li>
+        Finally, let's ingest 300,000 lines!
+        <br><br>
+        WARNING: Instead of printing 300,000 events to the terminal we could use a Logstash codec called dots that prints a dot for each processed event. With the following codec you can see the ingestion evolution without causing too much overhead.
+
+        <pre><code>  stdout {
+    codec => dots
+  }</code></pre>
+
+        Now, change the file input to read from /home/ubuntu/datasets/apache/access.log. It might take some time to ingest all logs.
+        Use the following query to check how many documents have been ingested so far. The response should be ~300,000 documents after logstash is done.
+
+        <pre class="bash">curl localhost:9200/logstash-*/_count</pre>
+
+        <div class="solution">
+          The full configuration file should now be:
+          <pre><code>input {
+  file {
+    path => "/home/ubuntu/datasets/apache/access.log"
+    sincedb_path => "/dev/null"
+    start_position => "beginning"
+  }
+}
+
+filter {
+  grok {
+    match => {
+      "message" => "%{COMBINEDAPACHELOG}"
+    }
+  }
+  mutate {
+    convert => { "bytes" => "integer" }
+  }
+  date {
+    match => [ "timestamp", "dd/MMM/YYYY:HH:mm:ss Z" ]
+    locale => en
+    remove_field => "timestamp"
+  }
+  geoip {
+    source => "clientip"
+  }
+  useragent {
+    source => "agent"
+    target => "useragent"
+  }
+  ruby {
+    init => "last = ::Time.parse('2014-09-25T04:00:00+00:00'); @shift = ::Time.now - last"
+    code => "event.set('@timestamp', LogStash::Timestamp.new(event.get('@timestamp') + @shift))"
+  }
+  mutate {
+    remove_field => [ "message", "@version", "path" ]
+  }
+}
+
+output {
+  stdout {
+    codec => dots
+  }
+  elasticsearch {}
+}</code></pre>
+        </div>
+      </li>
+
+      <li>
+        Now, load and explore the Kibana dashboard.
+        <br><br>
+        Create the logstash-* index pattern.
+        <img src="images/lab6_dashboard1.png">
+
+        Load the dashboard with the following command:
+        <pre class="bash">curl -i "http://localhost:5601/api/kibana/dashboards/import" -H 'Content-type: application/json' -H 'kbn-xsrf:true' -d @/home/ubuntu/datasets/kibana/apache_dashboard.json</pre>
+
+        Open the dashboard.
+        <img src="images/lab6_dashboard2.png">
+
+        Have fun!
+        <img src="images/lab6_dashboard3.png">
+      </li>
+
+    </ol>
+    <p>
+      <strong>Summary:</strong> You have configured a Logstash pipeline with more than 5 different filters to parse and enrich 300,000 apache logs. Then, you used Kibana to explore the data.
+    </p>
+    <hr/>
+
+
+
+
+        <!-- ******************************************************************************* -->
+
+
+
+
+
+    <a name="lab7"></a>
+    <h2>Lab 7: Data Store Integration</h2>
+    <p>
+      <strong>Objective:</strong> In this lab, you will install jdbc_input_plugin on your logstash installation, write configuration files to ingest data from a MySQL server database into elasticsearch.
+    </p>
+    <ol>
+      <li>
+        Get familiar with the data by logging into MySQL terminal client with the following credentials and database information.
+        <ul>
+          <li>User : ubuntu</li>
+          <li>Password : elastic</li>
+          <li>Database : employees</li>
+          <li>Table : EMP</li>
+        </ul>
+        <pre class="bash">
+$ mysql -u ubuntu -p<br>
+Enter password:<br>
+mysql> USE employees;<br>
+mysql> SHOW TABLES;<br>
+mysql> DESCRIBE EMP;<br>
+mysql> SELECT * FROM EMP;<br>
+mysql> quit
+        </pre>
+      </li>
+
+      <li>
+        In order to first test pulling records from inside the database, create a configuration file ls_mysql.conf and add an input section to use the jdbc_input_plugin. The mysql driver library can be found at /home/ubuntu/ami/mysql-connector-java-5.1.44.jar and the driver class is com.mysql.jdbc.Driver. Then, configure the output to just print to standard out. Use the rubyDebug codec so the output is printed in a readable format.
+          <div class="solution">
+            <pre><code>input {
+  jdbc {
+    jdbc_driver_library => "/home/ubuntu/ami/mysql-connector-java-5.1.44.jar"
+    jdbc_driver_class => "com.mysql.jdbc.Driver"
+    jdbc_connection_string => "jdbc:mysql://localhost:3306/employees"
+    jdbc_user => "ubuntu"
+    jdbc_password => "elastic"
+    statement => "SELECT * from EMP LIMIT 10"
+  }
+}
+
+output {
+  stdout { codec => rubydebug }
+}</pre></code>
+          </div>
+      </li>
+
+      <li>
+        Run Logstash with this configuration.
+
+        <div class="solution">
+          <pre class="bash">./logstash/bin/logstash -f ls_mysql.conf</pre>
+        </div>
+      </li>
+
+      <li>
+        If configurations are correct, you should start seeing snippets of data on Logstash output console as below:
+        <div class="bash">
+          <pre><code>{
+     "birth_day" => 1983-04-14T00:00:00.000Z,
+    "@timestamp" => 2017-09-27T13:29:56.096Z,
+        "gender" => "Male",
+          "city" => "Khotiv",
+        "mobile" => "465-381-0047",
+      "@version" => "1",
+     "last_name" => "Dewen",
+           "bio" => "Pellentesque at nulla...",
+            "id" => 1,
+    "department" => "Human Resources",
+    "first_name" => "Forester",
+         "email" => "fdewenrr@issuu.com"
+}
+.
+.
+.</pre></code>
+        </div>
+      </li>
+
+      <li>
+        Every block is a row of data retrieved from EMP table. After verifying that the data looks good, we can now proceed to indexing the full data into elasticsearch. In order to accomplish that, change the output to Elasticsearch, set the index to "employees", and remove the limit from the sql query (if you added).
+        <br/>
+        <div class="solution">
+          Content of the configuration file after you are done should be:
+          <pre><code>input {
+  jdbc {
+    jdbc_driver_library => "/home/ubuntu/ami/mysql-connector-java-5.1.44.jar"
+    jdbc_driver_class => "com.mysql.jdbc.Driver"
+    jdbc_connection_string => "jdbc:mysql://localhost:3306/employees"
+    jdbc_user => "ubuntu"
+    jdbc_password => "elastic"
+    statement => "SELECT * from EMP"
+  }
+}
+
+output {
+  elasticsearch {
+    index => "employees"
+  }
+}</pre></code>
+      </li>
+
+      <li>
+        Restart Logstash so it uses the new configuration and check if you have the data  (1000 documents) in Elasticsearch.
+        <br/>
+        <div class="solution">
+          <pre class="bash">./logstash/bin/logstash -f ls_mysql.conf</pre>
+          <pre class="bash">
+            curl 'localhost:9200/employees/_count'
+          </pre>
+        </div>
+      </li>
+    </ol>
+    <p>
+      <strong>Summary:</strong> This lab introduced you to installing, configuring and using jdbc_input plugin with Logstash. There are many additional configuration options available which can be referred to in logstash documentation.
+    </p>
+    <hr/>
+
+
+
+        <!-- ******************************************************************************* -->
+
+
+
+
+    <a name="lab8"></a>
+    <h2>Lab 8: Network Monitoring</h2>
+    <p>
+      <strong>Objective:</strong> In this lab you are going to configure packetbeat to collect live network communication in the current machine.
+    </p>
+    <ol>
+      <li>
+        First, open a new tab so we can work with packet and change to the packetbeat directory.
+
+        <div class="solution">
+          <pre class="bash">cd packetbeat</pre>
+        </div>
+      </li>
+
+      <li>
+        Now, use setcap to set the correct permissions so packetbeat has the rights to access network traffic without the need to run it as root.
+
+        <div class="solution">
+          <pre class="bash">sudo setcap cap_net_raw,cap_net_admin=eip packetbeat</pre>
+        </div>
+      </li>
+
+      <li>
+        Next, use packetbeat to have a look at which devices you have.
+
+        <div class="solution">
+          <pre class="bash">./packetbeat devices</pre>
+        </div>
+      </li>
+
+      <li>
+        Configure packetbeat to use the af_packet interface type it is faster and we are on Linux.
+
+        <div class="solution">
+          Open packetbeat.yml and add the following line.
+          <pre class="bash">vim packetbeat.yml</pre>
+          <pre><code>packetbeat.interfaces.type: af_packet</code></pre>
+        </div>
+      </li>
+
+      <li>
+        Remember to test config and output.
+
+        <div class="solution">
+          <pre class="bash">./packetbeat test config
+</pre>
+          <pre class="bash">./packetbeat test output
+</pre>
+        </div>
+      </li>
+
+      <li>
+        Load dashboards.
+
+        <div class="solution">
+          <pre class="bash">./packetbeat setup --dashboards</pre>
+        </div>
+      </li>
+
+      <li>
+        Start Packetbeat and set logging to the terminal.
+
+        <div class="solution">
+          <pre class="bash">./packetbeat -e</pre>
+        </div>
+      </li>
+
+      <li>
+        Open the packetbeat dashboards.
+
+        <img src="images/lab8_dashboard1.png">
+
+        <img src="images/lab8_dashboard2.png">
+
+      </li>
+
+      <li>
+        In the shell, make an HTTP request:
+        <pre class="bash">curl www.elastic.co</pre>
+        View it in the dashboards.
+        Execute the artificial_load script to see some action.
+      </li>
+
+      <li>
+        Go to discover search for http and investigate documents. Do they have payload?
+        Update the config to capture the entire payload.
+
+        <div class="solution">
+          Include the following line to the http configuration.
+          <pre><code>  include_body_for: ["text/html"]</code></pre>
+        </div>
+      </li>
+
+      <li>
+        Update the configuration to drop 200’s.
+
+        <div class="solution">
+          Add the following to the packetbeat.yml file.
+          <pre><code>processors:
+ - drop_event:
+      when:
+         equals:
+           http.response.code: 200</code></pre>
+        </div>
+      </li>
+
+      <li>
+        Configure flows to only use final=true
+
+        <div class="solution">
+          Change the packetbeat.flows period from 10s to -1.
+          <pre><code>packetbeat.flows:
+  timeout: 30s
+
+  period: -1</code></pre>
+        </div>
+      </li>
+
+    </ol>
+    <p>
+      <strong>Summary:</strong> In this lab you configured and used packetbeat to sniff the network. You were able to explore the Kibana dashboards to see requests to nginx, MySQL, and Elasticsearch.
+    </p>
+    <hr/>
+
+
+
+
+        <!-- ******************************************************************************* -->
+
+
+
+
+
+    <a name="lab9"></a>
+    <h2>Lab 9: Elastic Stack Architectures</h2>
+    <p>
+      <strong>Objective:</strong> In this lab you will use two Filebeat instances to send logs to Logstash. One Filebeat instance will ingest the same access.log used in lab 6 and the other instance will monitor nginx access logs.
+    </p>
+    <ol>
+
+      <li>
+        First, copy the Logstash config from lab 6 to a file named ls_lab9.conf and change it to receive events from Beats instead of reading directly from a file.
+
+        <div class="solution">
+          <pre class="bash">cp ls_apache.conf ls_lab9.conf<br>
+          vim ls_lab9.conf</pre>
+
+          The input configuration should look like:
+
+          <pre><code>input {
+  beats {
+    port => 5044
+  }
+}</code></pre>
+
+          The full configuration file should now be:
+          <pre><code>input {
+  beats {
+    port => 5044
+  }
+}
+
+filter {
+  grok {
+    match => {
+      "message" => "%{COMBINEDAPACHELOG}"
+    }
+  }
+  mutate {
+    convert => { "bytes" => "integer" }
+  }
+  date {
+    match => [ "timestamp", "dd/MMM/YYYY:HH:mm:ss Z" ]
+    locale => en
+    remove_field => "timestamp"
+  }
+  geoip {
+    source => "clientip"
+  }
+  useragent {
+    source => "agent"
+    target => "useragent"
+  }
+  ruby {
+    init => "last = ::Time.parse('2014-09-25T04:00:00+00:00'); @shift = ::Time.now - last"
+    code => "event.set('@timestamp', LogStash::Timestamp.new(event.get('@timestamp') + @shift))"
+  }
+  mutate {
+    remove_field => [ "message", "@version", "path" ]
+  }
+}
+
+output {
+  stdout {
+    codec => dots
+  }
+  elasticsearch {}
+}</code></pre>
+        </div>
+      </li>
+
+      <li>
+        Change the output to write to a monthly index prefixed with ls_lab9 and, optionally, remove the stdout from the output.
+
+        <div class="solution">
+
+          The output configuration should look like:
+          <pre><code>output {
+  elasticsearch {
+    index => "ls_lab9-%{+YYYY.MM}"
+  }
+}</code></pre>
+
+          The full configuration file should now be:
+          <pre><code>input {
+  beats {
+    port => 5044
+  }
+}
+
+filter {
+  grok {
+    match => {
+      "message" => "%{COMBINEDAPACHELOG}"
+    }
+  }
+  mutate {
+    convert => { "bytes" => "integer" }
+  }
+  date {
+    match => [ "timestamp", "dd/MMM/YYYY:HH:mm:ss Z" ]
+    locale => en
+    remove_field => "timestamp"
+  }
+  geoip {
+    source => "clientip"
+  }
+  useragent {
+    source => "agent"
+    target => "useragent"
+  }
+  ruby {
+    init => "last = ::Time.parse('2014-09-25T04:00:00+00:00'); @shift = ::Time.now - last"
+    code => "event.set('@timestamp', LogStash::Timestamp.new(event.get('@timestamp') + @shift))"
+  }
+  mutate {
+    remove_field => [ "message", "@version", "path" ]
+  }
+}
+
+output {
+  elasticsearch {
+    index => "ls_lab9-%{+YYYY.MM}"
+  }
+}</code></pre>
+        </div>
+      </li>
+
+      <li>
+        Now, configure the first Filebeat that will send data to logstash. This filebeat will read the access.log file and output to Logstash. You must also set the correct permissions (644)
+
+        <div class="solution">
+          <pre class="bash">
+            vim fb1_lab9.yml<br>
+            chmod 644 fb1_lab9.yml
+          </pre>
+
+          <pre><code>filebeat.prospectors:
+- type: log
+  enabled: true
+  paths:
+    - /home/ubuntu/datasets/apache/access.log
+
+output.logstash:
+  hosts: ["localhost:5044"]</code></pre>
+        </div>
+      </li>
+
+      <li>
+        Next, configure the second Filebeat that will send data to logstash. This filebeat will read nginx access logs and also output to logstash. Nginx logs can be found in /var/log/nginx/. Notice that there might be access logs gunziped and we don't want to include those. You must also set the correct permissions (644)
+
+        <div class="solution">
+          <pre class="bash">
+            vim fb2_lab9.yml
+            chmod 644 fb2_lab9.yml
+          </pre>
+
+          <pre><code>filebeat.prospectors:
+- type: log
+  enabled: true
+  paths:
+    - /var/log/nginx/host.access.log*
+  exclude_files: ['.gz$']
+
+output.logstash:
+  hosts: ["localhost:5044"]</code></pre>
+        </div>
+      </li>
+
+      <li>
+        Now, test your config files.
+
+        <div class="solution">
+          <pre class="bash">
+          ./filebeat/filebeat -c fb1_lab9.yml test config<br>
+          ./filebeat/filebeat -c fb2_lab9.yml test config<br>
+          ./logstash/bin/logstash -f ls_lab9.conf --config.test_and_exit
+          </pre>
+        </div>
+      </li>
+
+      <li>
+        Let's ingest data! Start Logstash followed by Filebeat with the first configuration file and, finally, start Filebeat with the second configuration file.<br><br>
+
+        <b>WARNING:</b> As you are going to start two Filebeat processes in the same machine, the second process will fail because the first one is already using the default data directory. In order to run two or more Filebeat processes in the same machine, they must have different data folders. When starting Filebeat use <kbd class="var">--path.data my_folder</kbd> to define the data folder for that process.
+
+        <div class="solution">
+          <pre class="bash">
+            ./logstash/bin/logstash -f ls_lab9.conf &<br>
+            ./filebeat/filebeat -c fb1_lab9.yml --path.data fb1 &<br>
+            ./filebeat/filebeat -c fb2_lab9.yml --path.data fb2 &<br>
+          </pre>
+        </div>
+      </li>
+
+      <li>
+        Use the following command to see the created indices. Do you see anything weird? Why do think that happened? Ask you instructor for help if you don't spot anything different.
+
+        <pre class="bash">
+          curl 'localhost:9200/_cat/indices/ls_lab9*'
+        </pre>
+
+        <div class="solution">
+          The output has one index in 2020. This happens because of the ruby filter that shifts logs from 2014 to now. However, logs from nginx are from now and therefore they are shifted to 2020. One way to solve that problem is to add an if around the ruby filter to test if the source matches apache.
+
+          <pre><code>  if [source] =~ "apache" {
+    ruby {...}
+  }</code></pre>
+
+          If you try to run everything again to see if the conditional works, delete the ls_lab9 indices and the path.data directories from beats.
+
+          <pre class="bash">
+            curl -XDELETE 'localhost:9200/ls_lab9*'<br>
+            rm -rf fb1<br>
+            rm -rf fb2<br>
+          </pre>
+        </div>
+      </li>
+    </ol>
+    <p>
+      <strong>Summary:</strong> In this lab you configured two Filebeat processes to monitor log files and send events to Logstash. Then, Logstash parses and enriches the events and writes to a monthly index in Elasticsearch.
+    </p>
+    <hr/>
+
+
+
+
+        <!-- ******************************************************************************* -->
+
+
+
+    <a name="lab10"></a> 
+    <h2>Lab 10: Triage and Maintenance</h2>
+    <p>
+      <strong>Objective:</strong> In this lab you will use the Logstash monitoring API and UI to monitor the data ingestion. Then, you will use the pipeline viewer to analyze each configured plugin in the ingestion pipeline.
+    </p>
+    <ol>
+      <li>
+        First, you need to install x-pack.
+        <br>
+        Let's start with Elasticsearch. Stop Elasticsearch and install the x-pack plugin:
+        
+        <pre class="bash">
+          Crtl+C<br>
+          ./elasticsearch/bin/elasticsearch-plugin install x-pack
+        </pre>
+        
+        Then, stop Kibana and install the x-pack plugin in Kibana (this will take a long time):
+        
+        <pre class="bash">
+          Crtl+C<br>
+          ./kibana/bin/kibana-plugin install x-pack
+        </pre>
+        
+        Finally, stop Logstash (if running) and install the x-pack plugin in Logstash:
+        
+        <pre class="bash">
+          Ctrl+C<br>
+          ./logstash/bin/logstash-plugin install x-pack
+        </pre>
+      </li>
+      
+      <li>
+        Next, let's setup x-pack.
+        <br>
+        Start Elasticsearch and set passwords for the 3 default users elastic, kibana, and logstash_system:
+        <pre class="bash">
+          ./elasticsearch/bin/elasticsearch<br>
+          ./elasticsearch/bin/x-pack/setup-passwords interactive
+        </pre>
+        
+        In Kibana, set username and password to access Elasticsearch.
+        
+        <pre class="bash">
+          vim ./kibana/config/kibana.yml
+        </pre>
+        
+        <pre><code>elasticsearch.username: "kibana"
+elasticsearch.password: "kibanapassword"</code></pre>
+        
+        In config/logstash.yml set the xpack monitoring password:
+        
+        <pre class="bash">
+          vim ./logstash/config/logstash.yml
+        </pre>
+        
+        <pre><code>xpack.monitoring.elasticsearch.password: logstashpassword</code></pre>
+      </li>
+      
+      <li>
+        Now that x-pack is installed and set, start Elasticsearch and Kibana. (Kibana will take some time to start as it executes some optimizations after a plugin installation.)
+        
+        <pre class="bash">
+          ./elasticsearch/bin/elasticsearch<br>
+          ./kibana/bin/kibana
+        </pre>
+        
+        To generate extra load and make this lab more interesting, re-run the Logstash instance from lab9 with both filebeats as input and don't forget to add username and password to the elasticsearch output plugin in the Logstash configuration file. The output configuration should look like:
+        <pre><code>output {
+  elasticsearch {
+    user => elastic
+    password => elasticpassword
+    index => "ls_lab9-%{+YYYY.MM}"
+  }
+}</code></pre>
+        
+        The full configuration file should now be:
+        <pre><code>input {
+  beats {
+    port => 5044
+  }
+}
+
+filter {
+  grok {
+    match => {
+      "message" => "%{COMBINEDAPACHELOG}"
+    }
+  }
+  mutate {
+    convert => { "bytes" => "integer" }
+  }
+  date {
+    match => [ "timestamp", "dd/MMM/YYYY:HH:mm:ss Z" ]
+    locale => en
+    remove_field => "timestamp"
+  }
+  geoip {
+    source => "clientip"
+  }
+  useragent {
+    source => "agent"
+    target => "useragent"
+  }
+  ruby {
+    init => "last = ::Time.parse('2014-09-25T04:00:00+00:00'); @shift = ::Time.now - last"
+    code => "event.set('@timestamp', LogStash::Timestamp.new(event.get('@timestamp') + @shift))"
+  }
+  mutate {
+    remove_field => [ "message", "@version", "path" ]
+  }
+}
+
+output {
+  elasticsearch {
+    user => elastic
+    password => elasticpassword
+    index => "ls_lab9-%{+YYYY.MM}"
+  }
+}</code></pre>
+        
+        Finally, in different terminals start the following:
+        <pre class="bash">
+          ./logstash/bin/logstash -f ls_lab9.conf<br>
+          rm -rf fb1; ./filebeat/filebeat -c fb1_lab9.yml --path.data fb1<br>
+          rm -rf fb2; ./filebeat/filebeat -c fb2_lab9.yml --path.data fb2<br>
+          ./scripts/nginx_load.sh medium
+        </pre>
+        </div>
+      </li>
+      </li>
+      
+      <li>
+        Now go to Kibana and explore both the Monitoring UI and the Pipeline Viewer. 
+        
+        <img src="images/lab10_dashboard1.png">
+        <img src="images/lab10_dashboard2.png">
+        <img src="images/lab10_dashboard3.png">
+        
+        <ul>
+    </ol>
+    <p>
+      <strong>Summary:</strong> In this lab you installed x-pack and used both the Monitoring UI and the Pipeline Viewer to monitor Logstash performance.
+    </p>
+    <hr/>
+    
+    <h3>End of Lab 10</h3>
+    <hr/>
+
+    <script type="text/javascript">
+      //build_questions()
+      build_solutions()
+
+      if(window.location.href.search('virtual') > 0) {
+        show_virtual();
+      }
+    </script>
+    <p>© Elasticsearch BV 2017. All rights reserved. Decompiling, copying, publishing and/or distribution without written consent of Elasticsearch BV is strictly prohibited.</p>
+  </body>
+</html>
